@@ -42,7 +42,7 @@ Si no cargás cargo fijo, reparte todo proporcionalmente por consumo:
 ```text
 precio_por_kWh = importe_total / consumo_total_kWh
 mi_importe = mi_consumo_kWh * precio_por_kWh
-importe_abuela = importe_total - mi_importe
+importe_otra_parte = importe_total - mi_importe
 ```
 
 Si cargás cargo fijo, el programa hace esto:
@@ -52,7 +52,7 @@ cargo_fijo_para_cada_uno = cargo_fijo_total / 2
 importe_variable = importe_total - cargo_fijo_total
 precio_por_kWh = importe_variable / consumo_total_kWh
 mi_importe = mi_consumo_kWh * precio_por_kWh + cargo_fijo_para_cada_uno
-importe_abuela = importe_total - mi_importe
+importe_otra_parte = importe_total - mi_importe
 ```
 
 ## Sobre la lectura de PDFs

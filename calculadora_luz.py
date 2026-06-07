@@ -60,22 +60,43 @@ def calculate_split(total_kwh, total_amount, my_kwh, fixed_amount=0):
     price_per_kwh = variable_amount / total_kwh
     my_variable_amount = my_kwh * price_per_kwh
     my_fixed_amount = fixed_amount / 2
-    grandmother_fixed_amount = fixed_amount / 2
+    other_party_fixed_amount = fixed_amount / 2
     my_amount = my_variable_amount + my_fixed_amount
-    grandmother_amount = total_amount - my_amount
+    other_party_amount = total_amount - my_amount
 
     return {
         "price_per_kwh": price_per_kwh,
         "variable_amount": variable_amount,
         "my_variable_amount": my_variable_amount,
         "my_fixed_amount": my_fixed_amount,
-        "grandmother_fixed_amount": grandmother_fixed_amount,
+        "other_party_fixed_amount": other_party_fixed_amount,
         "my_amount": my_amount,
-        "grandmother_amount": grandmother_amount,
+        "other_party_amount": other_party_amount,
     }
 
 
+def normalize_result(result):
+    if not isinstance(result, dict):
+        return result
+
+    if "other_party_amount" not in result and "grandmother_amount" in result:
+        result["other_party_amount"] = result["grandmother_amount"]
+    if "other_party_fixed_amount" not in result and "grandmother_fixed_amount" in result:
+        result["other_party_fixed_amount"] = result["grandmother_fixed_amount"]
+
+    result.pop("grandmother_amount", None)
+    result.pop("grandmother_fixed_amount", None)
+    return result
+
+
+def normalize_record(record):
+    if isinstance(record, dict):
+        normalize_result(record.get("result"))
+    return record
+
+
 def make_receipt(record):
+    normalize_record(record)
     return (
         "Comprobante de division de factura de luz\n"
         "========================================\n"
@@ -87,11 +108,11 @@ def make_receipt(record):
         f"Mi consumo: {format_number(record['my_kwh'])} kWh\n"
         f"Precio por kWh: {format_currency(record['result']['price_per_kwh'])}\n\n"
         f"Me corresponde pagar: {format_currency(record['result']['my_amount'])}\n"
-        f"Le corresponde pagar a mi abuela: {format_currency(record['result']['grandmother_amount'])}\n\n"
+        f"Le corresponde pagar a la otra parte: {format_currency(record['result']['other_party_amount'])}\n\n"
         "Detalle\n"
         f"- Mi parte por consumo: {format_currency(record['result']['my_variable_amount'])}\n"
         f"- Mi parte del cargo fijo: {format_currency(record['result']['my_fixed_amount'])}\n"
-        f"- Parte del cargo fijo de mi abuela: {format_currency(record['result']['grandmother_fixed_amount'])}\n"
+        f"- Parte del cargo fijo de la otra parte: {format_currency(record['result']['other_party_fixed_amount'])}\n"
     )
 
 
@@ -273,14 +294,14 @@ class ElectricityBillCalculator(tk.Tk):
         header = ttk.Label(parent, text="Historial", font=("Segoe UI", 12, "bold"))
         header.grid(row=0, column=0, sticky="w", pady=(0, 10))
 
-        columns = ("date", "my_amount", "grandmother_amount")
+        columns = ("date", "my_amount", "other_party_amount")
         self.history_tree = ttk.Treeview(parent, columns=columns, show="headings", selectmode="browse")
         self.history_tree.heading("date", text="Fecha")
         self.history_tree.heading("my_amount", text="Yo")
-        self.history_tree.heading("grandmother_amount", text="Abuela")
+        self.history_tree.heading("other_party_amount", text="Otra parte")
         self.history_tree.column("date", width=150, anchor="w")
         self.history_tree.column("my_amount", width=90, anchor="e")
-        self.history_tree.column("grandmother_amount", width=90, anchor="e")
+        self.history_tree.column("other_party_amount", width=90, anchor="e")
         self.history_tree.grid(row=1, column=0, sticky="nsew")
         self.history_tree.bind("<<TreeviewSelect>>", self.select_history_item)
 
@@ -340,7 +361,7 @@ class ElectricityBillCalculator(tk.Tk):
             f"Importe por consumo: {format_currency(result['variable_amount'])}\n"
             f"Cargo fijo dividido: {format_currency(result['my_fixed_amount'])} cada uno\n\n"
             f"Te corresponde pagar: {format_currency(result['my_amount'])}\n"
-            f"Le corresponde pagar a tu abuela: {format_currency(result['grandmother_amount'])}"
+            f"Le corresponde pagar a la otra parte: {format_currency(result['other_party_amount'])}"
         )
 
     def show_value_error(self, error):
@@ -403,7 +424,10 @@ class ElectricityBillCalculator(tk.Tk):
         except (OSError, json.JSONDecodeError):
             return []
 
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list):
+            return []
+
+        return [normalize_record(record) for record in data]
 
     def save_history(self):
         with HISTORY_FILE.open("w", encoding="utf-8") as file:
@@ -421,7 +445,7 @@ class ElectricityBillCalculator(tk.Tk):
                 values=(
                     record["date"],
                     format_currency(record["result"]["my_amount"]),
-                    format_currency(record["result"]["grandmother_amount"]),
+                    format_currency(record["result"]["other_party_amount"]),
                 ),
             )
 
